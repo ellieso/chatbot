@@ -46,6 +46,9 @@ def main():
             st.stop()
         try:
             files_text = get_text(uploaded_files)
+            if not files_text:
+                st.error("No valid documents were processed. Please check your files.")
+                st.stop()
             text_chunks = get_text_chunks(files_text)
             vetorestore = get_vectorstore(text_chunks)
             st.session_state.conversation = get_conversation_chain(vetorestore, openai_api_key)
@@ -74,16 +77,20 @@ def main():
 
             with st.spinner("Thinking..."):
                 try:
+                    if chain is None:
+                        st.error("Please process the documents first by clicking the 'Process' button.")
+                        st.stop()
                     result = chain({"question": query})
                     with get_openai_callback() as cb:
                         st.session_state.chat_history = result['chat_history']
                     response = result['answer']
-                    source_documents = result['source_documents']
+                    source_documents = result.get('source_documents', [])
 
                     st.markdown(response)
-                    with st.expander("참고 문서 확인"):
-                        for doc in source_documents:
-                            st.markdown(doc.metadata['source'], help=doc.page_content)
+                    if source_documents:
+                        with st.expander("참고 문서 확인"):
+                            for doc in source_documents:
+                                st.markdown(doc.metadata['source'], help=doc.page_content)
                 except openai.error.AuthenticationError:
                     st.error("Invalid OpenAI API key. Please check your key and try again.")
                     st.stop()
