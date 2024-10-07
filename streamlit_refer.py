@@ -95,8 +95,15 @@ def main():
                     st.error("An error occurred due to a missing variable. Please check your code and try again.")
                     st.stop()
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
-                    st.stop()
+                    if "insufficient_quota" in str(e):
+                        st.error("You have exceeded your current quota. Please check your plan and billing details.")
+                        st.stop()
+                    elif "rate_limit" in str(e).lower() or "429" in str(e):
+                        st.error("You have hit the rate limit. Please wait and try again later or upgrade your plan.")
+                        st.stop()
+                    else:
+                        st.error(f"An error occurred: {e}")
+                        st.stop()
 
         # Add assistant message to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
