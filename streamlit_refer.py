@@ -91,8 +91,8 @@ def main():
                         with st.expander("참고 문서 확인"):
                             for doc in source_documents:
                                 st.markdown(doc.metadata['source'], help=doc.page_content)
-                except openai.error.AuthenticationError:
-                    st.error("Invalid OpenAI API key. Please check your key and try again.")
+                except NameError:
+                    st.error("An error occurred due to a missing variable. Please check your code and try again.")
                     st.stop()
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
