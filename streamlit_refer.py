@@ -3,7 +3,7 @@ import tiktoken
 from loguru import logger
 
 from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOllama
 
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import Docx2txtLoader
@@ -15,9 +15,6 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.vectorstores import FAISS
 
-# from streamlit_chat import message
-from langchain.callbacks import get_openai_callback
-from langchain.memory import StreamlitChatMessageHistory
 
 def main():
     st.set_page_config(
@@ -37,21 +34,17 @@ def main():
 
     with st.sidebar:
         uploaded_files = st.file_uploader("Upload your file", type=['pdf', 'docx'], accept_multiple_files=True)
-        openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
         process = st.button("Process")
 
     if process:
-        if not openai_api_key:
-            st.error("Please add your OpenAI API key to continue.")
-            st.stop()
         try:
             files_text = get_text(uploaded_files)
             if not files_text:
                 st.error("No valid documents were processed. Please check your files.")
                 st.stop()
             text_chunks = get_text_chunks(files_text)
-            vetorestore = get_vectorstore(text_chunks)
-            st.session_state.conversation = get_conversation_chain(vetorestore, openai_api_key)
+            vectorstore = get_vectorstore(text_chunks)
+            st.session_state.conversation = get_conversation_chain(vectorstore)
             st.session_state.processComplete = True
         except Exception as e:
             st.error(f"Error processing files: {e}")
@@ -81,8 +74,6 @@ def main():
                         st.error("Please process the documents first by clicking the 'Process' button.")
                         st.stop()
                     result = chain({"question": query})
-                    with get_openai_callback() as cb:
-                        st.session_state.chat_history = result['chat_history']
                     response = result['answer']
                     source_documents = result.get('source_documents', [])
 
@@ -108,10 +99,12 @@ def main():
         # Add assistant message to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
+
 def tiktoken_len(text):
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)
     return len(tokens)
+
 
 def get_text(docs):
     doc_list = []
@@ -136,6 +129,7 @@ def get_text(docs):
         doc_list.extend(documents)
     return doc_list
 
+
 def get_text_chunks(text):
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=900,
@@ -144,6 +138,7 @@ def get_text_chunks(text):
     )
     chunks = text_splitter.split_documents(text)
     return chunks
+
 
 def get_vectorstore(text_chunks):
     embeddings = HuggingFaceEmbeddings(
@@ -154,18 +149,20 @@ def get_vectorstore(text_chunks):
     vectordb = FAISS.from_documents(text_chunks, embeddings)
     return vectordb
 
-def get_conversation_chain(vetorestore, openai_api_key):
-    llm = ChatOpenAI(openai_api_key=openai_api_key, model_name='gpt-3.5-turbo', temperature=0)
+
+def get_conversation_chain(vectorstore):
+    llm = ChatOllama(model="llama3.2:latest", temperature=0)
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         chain_type="stuff",
-        retriever=vetorestore.as_retriever(search_type='mmr', verbose=True),
+        retriever=vectorstore.as_retriever(search_type='mmr', verbose=True),
         memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
         get_chat_history=lambda h: h,
         return_source_documents=True,
         verbose=True
     )
     return conversation_chain
+
 
 if __name__ == '__main__':
     main()
