@@ -34,7 +34,7 @@ if prompt := st.chat_input("What is up?"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        stream = client.chat.completions.create(
+        response_stream = openai.ChatCompletion.create(
             model=st.session_state["openai_model"],
             messages=[
                 {"role": m["role"], "content": m["content"]}
@@ -42,5 +42,11 @@ if prompt := st.chat_input("What is up?"):
             ],
             stream=True,
         )
-        response = st.write_stream(stream)
-    st.session_state.messages.append({"role": "assistant", "content": response})
+
+        full_response = ""
+        for chunk in response_stream:
+            chunk_message = chunk["choices"][0].get("delta", {}).get("content", "")
+            full_response += chunk_message
+            st.write(chunk_message)
+
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
